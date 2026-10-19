@@ -1,0 +1,23 @@
+# Base scenario: boot -> ready -> arm -> external mode -> flight ->
+# setpoint stream loss -> hold.
+run:
+  seed: 42
+  duration_s: 40
+
+script:
+  - t_s: 5.0
+    do: "arm"
+
+  # Stream velocity setpoints at 20 Hz from 5.5 to 25 seconds.
+  # Command 5 m/s north and 1 m/s upward.
+  - t_s: 5.5
+    do: "setpoint_stream"
+    kind: "vel"
+    vx: 5.0
+    vz: -1.0
+    rate_hz: 20
+    until_s: 25.0
+
+  - t_s: 6.0
+    do: "mode"
+    mode: "EXTERNAL"

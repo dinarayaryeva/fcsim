@@ -1,0 +1,58 @@
+# Run all six faults sequentially during a single flight.
+run:
+  seed: 2026
+  duration_s: 100
+
+script:
+  - t_s: 5.0
+    do: "arm"
+
+  - t_s: 5.5
+    do: "setpoint_stream"
+    kind: "vel"
+    vx: 5.0
+    rate_hz: 20
+    until_s: 100
+
+  - t_s: 6.0
+    do: "mode"
+    mode: "EXTERNAL"
+
+fault:
+  # 1. Burst packet loss on a noisy UART or radio link.
+  - type: "link_loss"
+    start_s: 10
+    duration_s: 8
+    loss_prob: 0.1
+    burst_len: 3
+
+  # 2. Delivery delay and jitter caused by a congested link.
+  - type: "link_delay"
+    start_s: 20
+    duration_s: 8
+    delay_ms: 120
+    jitter_ms: 20
+
+  # 3. Stale telemetry: values freeze while timestamps and HEARTBEAT continue.
+  - type: "stale_data"
+    start_s: 30
+    duration_s: 8
+    fresh_timestamps: true
+
+  # 4. Gradual GNSS drift with matching reported velocity.
+  - type: "gnss_drift"
+    start_s: 40
+    duration_s: 20
+    rate_mps: 0.5
+    consistent_velocity: true
+
+  # 5. Silently limit commanded speed while setpoints keep arriving.
+  - type: "setpoint_clamp"
+    start_s: 65
+    duration_s: 10
+    max_speed_mps: 2.0
+
+  # 6. Reboot the flight controller in flight.
+  - type: "fc_reboot"
+    start_s: 80
+    duration_s: 6
