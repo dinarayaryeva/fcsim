@@ -13,6 +13,8 @@ from .transport import RecordingTransport
 NOT_READY, READY, MANUAL, EXTERNAL, HOLD = range(5)
 MODE_NAMES = ["NOT_READY", "READY", "MANUAL", "EXTERNAL", "HOLD"]
 
+GROUND_FLAG = False
+
 # Telemetry schedule: (period_us, phase_us).
 # Phases spread messages across time instead of emitting them in a burst.
 TELEMETRY = {
@@ -75,6 +77,8 @@ class Sim:
         self._wd_pending = False
         self._low_batt_warned = False
         self._started = False
+
+        self.cur_alt = cfg["origin_alt_m"]
 
         self.faults = make_faults(cfg)
         self._bootstrap()
@@ -177,6 +181,11 @@ class Sim:
 
         if self.down or self.mode != EXTERNAL:
             return
+        
+        if self.cur_alt == 0:
+            GROUND_FLAG = True
+        else:
+            GROUND_FLAG = False
 
         if t - self.sp_rx_us > self.timeout_us:
             self._set_mode(t, HOLD, "setpoint timeout")
@@ -388,9 +397,14 @@ class Sim:
             return RES_OK
 
         if self.armed:
-            self.armed = False
-            self._set_mode(t, READY, "disarmed")
-
+            if GROUND_FLAG: 
+                self.armed = False
+                self._set_mode(t, READY, "disarmed")
+                return RES_OK
+            else:
+                self.statustext(t, SEV_ERROR, "Arm denied: not grounded")
+                return RES_DENIED
+            
         return RES_OK
 
     def _cmd_mode(self, t, custom):
@@ -551,6 +565,8 @@ class Sim:
         )
 
         vel_noise = cfg["noise_vel_mps"]
+
+        self.cur_alt = round((cfg["origin_alt_m"] - down) * 1000)
 
         return dict(
             time_boot_ms=self._tb(t),
